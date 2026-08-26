@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>경기대회 플래시암산 연습하기</title>
+<title>대한민국 주산암산 경기대회 플래시암산</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
@@ -96,9 +96,13 @@
     font-family:Arial,'Helvetica Neue',sans-serif;
     font-weight:900;font-style:italic;
     font-size:380px;color:var(--pos);line-height:1;
+    display:flex;align-items:baseline;justify-content:center;
   }
-  .flash-num.pop{animation:pop .16s ease-out;}
-  @keyframes pop{from{transform:scale(.82);opacity:.35;}to{transform:scale(1);opacity:1;}}
+  .flash-digits-wrap{position:relative;display:inline-block;white-space:nowrap;}
+  .flash-sign{position:absolute;left:-0.4765em;top:0;visibility:hidden;}
+  .flash-sign.neg{visibility:visible;}
+  .flash-digits{white-space:nowrap;}
+  .flash-comma{font-size:50%;}
 
   /* prompt / write card */
   .prompt-text{font-size:104px;color:var(--blue);font-weight:700;font-style:italic;}
@@ -318,6 +322,9 @@ function bigFont(len, base){
   const size = base - Math.max(0, len-2)*40;
   return Math.max(140, size) + 'px';
 }
+/* 플래시 숫자 크기는 문제마다(자릿수마다) 바뀌면 혼란스러우므로,
+   1~20번 중 자릿수가 가장 큰 20번(5자리) 기준 크기로 전체 세션 동안 고정한다 */
+const FLASH_FONT_PX = parseFloat(bigFont(5, 380)) * 0.8;
 /* 문제식(예: "999 + 888 - 444") 길이에 맞춰 최대한 크게 - 뒷자리에서도 보이도록 */
 function exprFontSize(expr){
   const len = expr.length;
@@ -467,12 +474,22 @@ function hasAllSameDigits(n){
 }
 function digitKey(n){ return String(n).split('').sort().join(''); }
 function leadingDigit(n){ return String(n)[0]; }
+function hasConsecutiveZero(n){ return String(n).indexOf('00') !== -1; }
+function hasZeroDigit(n){ return String(n).indexOf('0') !== -1; }
 /* 연속된 두 수가 같은 값/자릿수 구성을 갖지 않도록 하는 것에 더해,
    맨 앞자리(최상위 자릿수) 숫자도 직전 수와 겹치지 않도록 한다
-   (예: 33+38, 991+982 처럼 앞자리가 반복되는 패턴을 지양). */
-function pickVariedNumber(lo, hi, prevAbsVal){
+   (예: 33+38, 991+982 처럼 앞자리가 반복되는 패턴을 지양).
+   noConsecZero: 100, 1004처럼 0이 연속으로 나오는 것을 금지 (3자리 이상, 15번~).
+   forceNoZero: 0이 아예 포함되지 않도록 강제 (4자리 이상에서 0 포함 행 개수 제한용, 17번~). */
+function pickVariedNumber(lo, hi, prevAbsVal, noConsecZero, forceNoZero){
+  function passExtra(v){
+    if(noConsecZero && hasConsecutiveZero(v)) return false;
+    if(forceNoZero && hasZeroDigit(v)) return false;
+    return true;
+  }
   for(let t=0; t<400; t++){
     const v = randInt(lo, hi);
+    if(!passExtra(v)) continue;
     if(hasAllSameDigits(v)) continue;
     if(prevAbsVal !== null && digitKey(v) === digitKey(prevAbsVal)) continue;
     if(prevAbsVal !== null && leadingDigit(v) === leadingDigit(prevAbsVal)) continue;
@@ -480,8 +497,20 @@ function pickVariedNumber(lo, hi, prevAbsVal){
   }
   for(let t=0; t<400; t++){
     const v = randInt(lo, hi);
+    if(!passExtra(v)) continue;
     if(prevAbsVal !== null && digitKey(v) === digitKey(prevAbsVal)) continue;
     if(prevAbsVal !== null && leadingDigit(v) === leadingDigit(prevAbsVal)) continue;
+    return v;
+  }
+  for(let t=0; t<400; t++){
+    const v = randInt(lo, hi);
+    if(!passExtra(v)) continue;
+    if(prevAbsVal !== null && leadingDigit(v) === leadingDigit(prevAbsVal)) continue;
+    return v;
+  }
+  for(let t=0; t<400; t++){
+    const v = randInt(lo, hi);
+    if(!passExtra(v)) continue;
     return v;
   }
   for(let t=0; t<400; t++){
@@ -500,21 +529,29 @@ function generateProblem(cfg){
   const [lo,hi] = digitRange(cfg.digits);
   const floor = Math.pow(10, cfg.digits-1);
   const negPositions = cfg.neg ? cfg.neg.slice() : (cfg.negOptions ? pick(cfg.negOptions).slice() : []);
+  /* 15번(3자리)부터는 100, 1004처럼 0이 연속으로 나오는 수를 지양하고,
+     17번(4자리)부터는 한 문제 안에서 0이 포함된 수가 최대 2개까지만 나오도록 한다 */
+  const noConsecZero = cfg.digits >= 3;
+  const zeroCap = cfg.digits >= 4 ? 2 : Infinity;
   for(let attempt=0; attempt<3000; attempt++){
     let rows = [];
     let total = 0;
     let ok = true;
+    let zeroCount = 0;
     for(let i=1; i<=cfg.rows; i++){
       const prevAbsVal = rows.length > 0 ? Math.abs(rows[rows.length-1]) : null;
+      const forceNoZero = zeroCount >= zeroCap;
       if(negPositions.indexOf(i) !== -1){
         const minM = lo;
         const maxM = Math.min(hi, total - floor);
         if(maxM < minM){ ok = false; break; }
-        const m = pickVariedNumber(minM, maxM, prevAbsVal);
+        const m = pickVariedNumber(minM, maxM, prevAbsVal, noConsecZero, forceNoZero);
+        if(hasZeroDigit(m)) zeroCount++;
         total -= m;
         rows.push(-m);
       } else {
-        const v = pickVariedNumber(lo, hi, prevAbsVal);
+        const v = pickVariedNumber(lo, hi, prevAbsVal, noConsecZero, forceNoZero);
+        if(hasZeroDigit(v)) zeroCount++;
         total += v;
         rows.push(v);
       }
@@ -527,7 +564,7 @@ function generateProblem(cfg){
   let rows = [], total = 0;
   for(let i=1; i<=cfg.rows; i++){
     const prevAbsVal = rows.length > 0 ? Math.abs(rows[rows.length-1]) : null;
-    const v = pickVariedNumber(lo, hi, prevAbsVal);
+    const v = pickVariedNumber(lo, hi, prevAbsVal, noConsecZero, false);
     total += v; rows.push(v);
   }
   return {rows: rows, total: total, cfg: cfg};
@@ -703,18 +740,26 @@ function renderReady(){
   contentEl.innerHTML = '<div class="screen"><div class="card"><div class="prep-text">준비</div></div></div>';
 }
 async function runFlash(p, myToken){
-  contentEl.innerHTML = '<div class="screen"><div class="card"><div id="flashNum" class="flash-num"></div></div></div>';
+  contentEl.innerHTML =
+    '<div class="screen"><div class="card">' +
+      '<div id="flashNum" class="flash-num">' +
+        '<span class="flash-digits-wrap">' +
+          '<span class="flash-sign" id="flashSign">-</span>' +
+          '<span class="flash-digits" id="flashDigits"></span>' +
+        '</span>' +
+      '</div>' +
+    '</div></div>';
   const numEl = document.getElementById('flashNum');
+  const signEl = document.getElementById('flashSign');
+  const digitsEl = document.getElementById('flashDigits');
   for(let i=0; i<p.rows.length; i++){
     checkAlive(myToken);
     const v = p.rows[i];
-    const s = String(v);
-    numEl.textContent = s;
-    numEl.style.fontSize = (parseFloat(bigFont(s.length, 380)) * 0.8) + 'px';
+    const av = Math.abs(v);
+    numEl.style.fontSize = FLASH_FONT_PX + 'px';
     numEl.style.color = 'var(--pos)';
-    numEl.classList.remove('pop');
-    void numEl.offsetWidth;
-    numEl.classList.add('pop');
+    signEl.classList.toggle('neg', v < 0);
+    digitsEl.innerHTML = av.toLocaleString('en-US').replace(/,/g, '<span class="flash-comma">,</span>');
     beep();
     await wait(800);
     checkAlive(myToken);
@@ -816,11 +861,10 @@ function renderResult(results){
     return;
   }
   const correctCount = results.filter(r=>r.correct).length;
-  const score = Math.round(correctCount/results.length*100);
   app.innerHTML =
     '<div class="screen result-screen">' +
       '<div class="result-headline">' + correctCount + ' / ' + results.length + ' 문제 정답!</div>' +
-      '<div class="result-score">' + score + '점 · 항목을 누르면 문제를 다시 볼 수 있어요</div>' +
+      '<div class="result-score">항목을 누르면 문제를 다시 볼 수 있어요</div>' +
       '<div class="result-grid">' +
         results.map((r,idx) =>
           '<div class="result-item ' + (r.correct ? 'ok' : 'no') + '" data-idx="' + idx + '">' +
