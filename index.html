@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>대한민국 주산암산 경기대회 플래시암산</title>
+<title>주산수리셈 플래시 암산</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
@@ -24,11 +24,11 @@
     user-select:none;
   }
   #stageOuter{
-    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(circle at 50% 15%, #0e3d28, #01130c 78%);
   }
   #stage{
-    width:1600px;height:900px;position:relative;overflow:hidden;border-radius:22px;
+    width:1600px;height:900px;flex:none;position:relative;overflow:hidden;border-radius:22px;
     background:
       linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.18)),
       radial-gradient(circle at 28% 18%, #16814f 0%, #0b5c3a 45%, #063d27 100%);
@@ -252,13 +252,62 @@
    공통) 중간에 음수가 되지 않도록 하며, 뺄셈 결과는 해당 자리수 이상을 유지
 ========================================================= */
 
-/* ---------- 화면 스케일 (1600x900 고정 캔버스) ---------- */
+/* ---------- 화면 스케일 (1600x900 고정 캔버스, 모바일 대응) ---------- */
+const stageOuter = document.getElementById('stageOuter');
 const stage = document.getElementById('stage');
-function resizeStage(){
-  const scale = Math.min(window.innerWidth/1600, window.innerHeight/900);
-  stage.style.transform = 'scale(' + scale + ')';
+let rotateHintEl = null;
+
+function getViewportRect(){
+  if(window.visualViewport){
+    const vv = window.visualViewport;
+    return { w: vv.width, h: vv.height, x: vv.offsetLeft || 0, y: vv.offsetTop || 0 };
+  }
+  return { w: window.innerWidth, h: window.innerHeight, x: 0, y: 0 };
 }
+
+function ensureRotateHint(){
+  if(rotateHintEl) return rotateHintEl;
+  rotateHintEl = document.createElement('div');
+  rotateHintEl.id = 'rotateHint';
+  rotateHintEl.textContent = '🔄 화면을 가로로 돌려주세요';
+  rotateHintEl.style.cssText =
+    'position:fixed;left:50%;bottom:14px;transform:translateX(-50%);' +
+    'background:rgba(0,0,0,0.55);color:#fff;font-family:"Jua","Noto Sans KR",sans-serif;' +
+    'font-size:14px;padding:8px 18px;border-radius:999px;z-index:9999;' +
+    'pointer-events:none;white-space:nowrap;display:none;';
+  document.body.appendChild(rotateHintEl);
+  return rotateHintEl;
+}
+
+function resizeStage(){
+  const vp = getViewportRect();
+  const w = vp.w, h = vp.h;
+  if(!w || !h) return;
+  stageOuter.style.width = w + 'px';
+  stageOuter.style.height = h + 'px';
+  stageOuter.style.left = vp.x + 'px';
+  stageOuter.style.top = vp.y + 'px';
+
+  const portrait = h > w;
+  const hint = ensureRotateHint();
+  if(portrait){
+    /* 세로 화면(휴대폰 세로보기)에서는 가로형 캔버스를 90도 회전해 화면을 최대한 채운다 */
+    const scale = Math.min(w/900, h/1600);
+    stage.style.transform = 'rotate(90deg) scale(' + scale + ')';
+    hint.style.display = 'block';
+  } else {
+    const scale = Math.min(w/1600, h/900);
+    stage.style.transform = 'scale(' + scale + ')';
+    hint.style.display = 'none';
+  }
+}
+
 window.addEventListener('resize', resizeStage);
+window.addEventListener('orientationchange', function(){ setTimeout(resizeStage, 200); });
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', resizeStage);
+  window.visualViewport.addEventListener('scroll', resizeStage);
+}
 resizeStage();
 
 /* ---------- 유틸 ---------- */
