@@ -481,10 +481,13 @@ function hasZeroDigit(n){ return String(n).indexOf('0') !== -1; }
    (예: 33+38, 991+982 처럼 앞자리가 반복되는 패턴을 지양).
    noConsecZero: 100, 1004처럼 0이 연속으로 나오는 것을 금지 (3자리 이상, 15번~).
    forceNoZero: 0이 아예 포함되지 않도록 강제 (4자리 이상에서 0 포함 행 개수 제한용, 17번~). */
-function pickVariedNumber(lo, hi, prevAbsVal, noConsecZero, forceNoZero){
+function endsInZero(n){ return Math.abs(n) % 10 === 0; }
+function pickVariedNumber(lo, hi, prevAbsVal, opts){
+  opts = opts || {};
   function passExtra(v){
-    if(noConsecZero && hasConsecutiveZero(v)) return false;
-    if(forceNoZero && hasZeroDigit(v)) return false;
+    if(opts.noConsecZero && hasConsecutiveZero(v)) return false;
+    if(opts.forceNoZero && hasZeroDigit(v)) return false;
+    if(opts.noTrailingZero && endsInZero(v)) return false;
     return true;
   }
   for(let t=0; t<400; t++){
@@ -530,9 +533,13 @@ function generateProblem(cfg){
   const floor = Math.pow(10, cfg.digits-1);
   const negPositions = cfg.neg ? cfg.neg.slice() : (cfg.negOptions ? pick(cfg.negOptions).slice() : []);
   /* 15번(3자리)부터는 100, 1004처럼 0이 연속으로 나오는 수를 지양하고,
-     17번(4자리)부터는 한 문제 안에서 0이 포함된 수가 최대 2개까지만 나오도록 한다 */
+     17번(4자리)부터는 한 문제 안에서 0이 포함된 수가 최대 2개까지만 나오도록 한다.
+     10~12번(2자리, 5행)은 20/90/80처럼 0으로 끝나는(=0이 포함된) 수 자체를 아예 배제한다.
+     15번 이상부터는 문제의 마지막 수가 0으로 끝나지 않도록 한다(중간 행은 0이 있어도 됨). */
   const noConsecZero = cfg.digits >= 3;
   const zeroCap = cfg.digits >= 4 ? 2 : Infinity;
+  const forceNoZeroAlways = cfg.noZero === true || (cfg.no >= 10 && cfg.no <= 12);
+  const noTrailingZeroRule = cfg.digits >= 3;
   for(let attempt=0; attempt<3000; attempt++){
     let rows = [];
     let total = 0;
@@ -540,17 +547,22 @@ function generateProblem(cfg){
     let zeroCount = 0;
     for(let i=1; i<=cfg.rows; i++){
       const prevAbsVal = rows.length > 0 ? Math.abs(rows[rows.length-1]) : null;
-      const forceNoZero = zeroCount >= zeroCap;
+      const forceNoZero = forceNoZeroAlways || (zeroCount >= zeroCap);
+      const opts = {
+        noConsecZero: noConsecZero,
+        forceNoZero: forceNoZero,
+        noTrailingZero: noTrailingZeroRule && (i === cfg.rows)
+      };
       if(negPositions.indexOf(i) !== -1){
         const minM = lo;
         const maxM = Math.min(hi, total - floor);
         if(maxM < minM){ ok = false; break; }
-        const m = pickVariedNumber(minM, maxM, prevAbsVal, noConsecZero, forceNoZero);
+        const m = pickVariedNumber(minM, maxM, prevAbsVal, opts);
         if(hasZeroDigit(m)) zeroCount++;
         total -= m;
         rows.push(-m);
       } else {
-        const v = pickVariedNumber(lo, hi, prevAbsVal, noConsecZero, forceNoZero);
+        const v = pickVariedNumber(lo, hi, prevAbsVal, opts);
         if(hasZeroDigit(v)) zeroCount++;
         total += v;
         rows.push(v);
@@ -564,7 +576,11 @@ function generateProblem(cfg){
   let rows = [], total = 0;
   for(let i=1; i<=cfg.rows; i++){
     const prevAbsVal = rows.length > 0 ? Math.abs(rows[rows.length-1]) : null;
-    const v = pickVariedNumber(lo, hi, prevAbsVal, noConsecZero, false);
+    const v = pickVariedNumber(lo, hi, prevAbsVal, {
+      noConsecZero: noConsecZero,
+      forceNoZero: forceNoZeroAlways,
+      noTrailingZero: noTrailingZeroRule && (i === cfg.rows)
+    });
     total += v; rows.push(v);
   }
   return {rows: rows, total: total, cfg: cfg};
