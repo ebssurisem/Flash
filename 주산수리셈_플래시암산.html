@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>주산수리셈 플래시 암산</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --yellow:#ffe14d;
+    --pos:#111111;
+    --neg:#d21f1f;
+    --blue:#1d4fd8;
+    --green:#15803d;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    height:100%;margin:0;padding:0;background:#000;overflow:hidden;
+    font-family:'Jua','Noto Sans KR',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;
+  }
+  #stageOuter{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 15%, #0e3d28, #01130c 78%);
+  }
+  #stage{
+    width:1600px;height:900px;position:relative;overflow:hidden;border-radius:22px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.18)),
+      radial-gradient(circle at 28% 18%, #16814f 0%, #0b5c3a 45%, #063d27 100%);
+    box-shadow:0 0 0 12px #052617, 0 40px 100px rgba(0,0,0,0.65);
+    transform-origin:center center;
+  }
+  #app{width:100%;height:100%;position:relative;}
+
+  /* ---------- topbar (session runner) ---------- */
+  #topbar{
+    position:absolute;top:0;left:0;right:0;height:104px;z-index:5;
+    display:flex;align-items:center;justify-content:space-between;padding:0 44px;
+    background:linear-gradient(180deg, rgba(0,0,0,0.38), rgba(0,0,0,0));
+  }
+  .logo{font-size:36px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.4);}
+  .logo span{color:#ffd400;}
+  .progress{font-size:30px;color:#fff;background:rgba(0,0,0,0.28);padding:10px 30px;border-radius:32px;}
+  .quit-btn{
+    font-size:26px;background:#d21f1f;color:#fff;border:none;border-radius:32px;
+    padding:12px 30px;cursor:pointer;box-shadow:0 5px 0 #8f1414;font-family:'Jua',sans-serif;
+  }
+  .quit-btn:active{transform:translateY(4px);box-shadow:none;}
+  .sound-btn, .review-btn{
+    font-size:24px;background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:32px;
+    padding:12px 26px;cursor:pointer;font-family:'Jua',sans-serif;margin-right:14px;
+  }
+  .sound-btn:active, .review-btn:active{transform:translateY(3px);}
+  .viewans-btn{
+    font-size:24px;background:var(--green);color:#fff;border:none;border-radius:32px;
+    padding:12px 28px;cursor:pointer;font-family:'Jua',sans-serif;margin-right:14px;
+    box-shadow:0 5px 0 #0e5e2c;
+  }
+  .viewans-btn:active{transform:translateY(4px);box-shadow:none;}
+  .topbar-right{display:flex;align-items:center;}
+
+  .content{position:absolute;top:104px;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;}
+  .screen{width:100%;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:30px;}
+
+  /* ---------- yellow card ---------- */
+  .card{
+    background:var(--yellow);border-radius:64px;
+    box-shadow:0 0 0 9px #1a1a1a, 0 22px 0 rgba(0,0,0,0.25);
+    width:1260px;height:600px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
+    padding:20px;
+  }
+
+  /* intro card */
+  .intro-card .badge{
+    font-size:96px;background:#111;color:#ffd400;padding:20px 74px;border-radius:110px;
+    box-shadow:0 6px 0 rgba(0,0,0,.3);
+  }
+  .intro-card .sub{font-size:46px;color:#2b2b2b;}
+  .intro-card .tip{font-size:32px;color:#5b5b5b;}
+  .intro-card .btn-next{margin-top:6px;}
+
+  /* ready card */
+  .prep-text{
+    font-size:230px;color:var(--blue);font-weight:700;letter-spacing:14px;
+    text-shadow:0 6px 0 rgba(0,0,0,.12);
+  }
+
+  /* flash card */
+  .flash-num{
+    font-family:Arial,'Helvetica Neue',sans-serif;
+    font-weight:900;font-style:italic;
+    font-size:380px;color:var(--pos);line-height:1;
+  }
+  .flash-num.pop{animation:pop .16s ease-out;}
+  @keyframes pop{from{transform:scale(.82);opacity:.35;}to{transform:scale(1);opacity:1;}}
+
+  /* prompt / write card */
+  .prompt-text{font-size:104px;color:var(--blue);font-weight:700;font-style:italic;}
+  .countdown{
+    font-family:Arial,sans-serif;font-weight:900;font-style:italic;
+    font-size:170px;color:#111;line-height:1;
+  }
+  .timebar{width:640px;height:26px;background:rgba(0,0,0,.15);border-radius:14px;overflow:hidden;}
+  .timebar-fill{height:100%;background:var(--blue);width:100%;}
+
+  /* reveal card */
+  .reveal-label{font-size:66px;color:var(--green);}
+  .reveal-num{
+    font-family:Arial,sans-serif;font-weight:900;font-style:italic;
+    font-size:230px;color:var(--green);line-height:1;
+  }
+
+  /* buttons */
+  .btn-next{
+    font-size:40px;padding:20px 62px;border-radius:52px;border:none;
+    background:var(--blue);color:#fff;cursor:pointer;box-shadow:0 6px 0 #123a9c;
+    font-family:'Jua',sans-serif;
+  }
+  .btn-next:active{transform:translateY(4px);box-shadow:none;}
+  .btn-secondary{
+    font-size:32px;padding:16px 46px;border-radius:52px;border:none;
+    background:#555;color:#fff;cursor:pointer;margin-left:24px;font-family:'Jua',sans-serif;
+  }
+  .btn-secondary:active{transform:translateY(4px);}
+
+  /* ---------- competition answer input ---------- */
+  .input-panel-bg{
+    background:rgba(255,255,255,0.08);border-radius:70px;padding:56px 64px;
+    display:flex;flex-direction:column;align-items:center;gap:34px;
+  }
+  .answer-display{
+    width:900px;height:170px;background:#fff;border-radius:34px;box-shadow:0 0 0 8px #111;
+    display:flex;align-items:center;justify-content:center;
+    font-family:Arial,sans-serif;font-weight:900;font-style:italic;font-size:104px;color:#111;
+  }
+  .answer-display:empty::before{content:'정답을 입력하세요';font-size:34px;color:#999;font-style:normal;font-family:'Jua',sans-serif;}
+  .keypad{display:grid;grid-template-columns:repeat(3,220px);grid-gap:20px;}
+  .key{
+    font-size:54px;background:#fff;border:none;border-radius:26px;box-shadow:0 6px 0 #bbb;
+    cursor:pointer;font-family:'Jua',sans-serif;height:116px;color:#111;
+  }
+  .key:active{transform:translateY(4px);box-shadow:none;}
+  .key-clear{background:#ffb020;font-size:34px;}
+  .key-submit{background:#16a34a;color:#fff;}
+
+  /* ---------- home / setup ---------- */
+  .home{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:46px;}
+  .home-logo{font-size:88px;color:#fff;text-align:center;}
+  .home-logo span{color:#ffd400;}
+  .home-sub{font-size:32px;color:#cfe9da;text-align:center;}
+  .mode-cards{display:flex;gap:60px;}
+  .mode-card{
+    width:480px;height:420px;background:var(--yellow);border-radius:52px;
+    box-shadow:0 0 0 9px #111,0 20px 0 rgba(0,0,0,.25);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
+    cursor:pointer;transition:transform .15s;
+  }
+  .mode-card:hover{transform:translateY(-10px);}
+  .mode-icon{font-size:104px;}
+  .mode-title{font-size:54px;color:#111;}
+  .mode-desc{font-size:25px;color:#444;text-align:center;line-height:1.55;padding:0 30px;}
+
+  .setup-group{display:flex;flex-direction:column;align-items:center;gap:20px;}
+  .setup-label{font-size:36px;color:#fff;}
+  .setup-options{display:flex;gap:22px;}
+  .opt-btn{
+    font-size:32px;padding:16px 42px;border-radius:44px;border:none;background:#fff;
+    color:#111;cursor:pointer;font-family:'Jua',sans-serif;
+  }
+  .opt-btn.active{background:#ffd400;box-shadow:0 0 0 6px #111;}
+
+  /* ---------- result ---------- */
+  .result-screen{padding:50px 60px;gap:22px;}
+  .result-headline{font-size:76px;color:#fff;text-align:center;}
+  .result-score{font-size:52px;color:#ffd400;}
+  .result-grid{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:14px;width:1440px;
+    max-height:420px;overflow-y:auto;padding:12px;
+  }
+  .result-item{
+    background:#fff;border-radius:16px;padding:12px 18px;display:flex;flex-direction:column;
+    font-size:21px;color:#111;gap:2px;
+  }
+  .result-item.ok{border-left:8px solid #16a34a;}
+  .result-item.no{border-left:8px solid #d21f1f;}
+  .result-item .rq{font-size:24px;font-weight:bold;}
+  .result-item{cursor:pointer;}
+  .result-item .rq-view{font-size:16px;color:#888;margin-top:4px;}
+  .result-actions{margin-top:10px;display:flex;}
+  .classroom-grid{grid-template-columns:1fr !important;max-height:620px;width:1500px;}
+  .classroom-grid .result-item{
+    gap:10px;flex-direction:row;align-items:center;justify-content:space-between;
+    padding:22px 34px;cursor:default;
+  }
+  .classroom-grid .rq{flex:none;font-size:28px;}
+  .classroom-grid .rexpr{
+    color:#222;font-family:Arial,sans-serif;font-weight:bold;font-style:italic;
+    word-break:break-all;flex:1;text-align:left;margin:0 20px;
+  }
+  .classroom-grid .rans{font-size:38px;color:#15803d;font-weight:bold;flex:none;}
+
+  /* ---------- modal (문제 다시보기) ---------- */
+  .modal-overlay{
+    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,0.65);z-index:60;
+  }
+  .modal-card{
+    background:#fff;border-radius:44px;padding:56px 66px;max-width:1440px;max-height:800px;
+    overflow-y:auto;display:flex;flex-direction:column;gap:28px;align-items:center;
+    box-shadow:0 0 0 8px #111;
+  }
+  .modal-title{font-size:50px;color:#111;}
+  .modal-expr{
+    font-family:Arial,sans-serif;font-weight:900;font-style:italic;color:#111;
+    text-align:center;word-break:break-all;max-width:1280px;line-height:1.3;
+  }
+  .modal-answer{font-family:Arial,sans-serif;font-weight:900;font-style:italic;font-size:76px;color:var(--green);}
+  .modal-empty{font-size:30px;color:#666;}
+
+  ::-webkit-scrollbar{width:14px;}
+  ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.3);border-radius:8px;}
+</style>
+</head>
+<body>
+<div id="stageOuter">
+  <div id="stage">
+    <div id="app"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   주산수리셈 플래시 암산 - 대회연습용 / 수업용
+   문제 생성 규칙 (요강 및 사용자 지정 규칙 기반)
+   1) 1~9번  : 1자리(1위) 숫자, 보수(10의 보수) 위주로 출제.
+               5의 보수("짝")와 이중보수(5+10의 보수 동시 사용)는 절대 출제하지 않음.
+               직접가산(그대로 더하기)과 10의 보수만 사용 - 실제 20/21회 기출문제로
+               검증한 패턴(직접:보수 ≈ 50:50, 5의보수·이중보수 0%)을 그대로 재현.
+               1~3번 5행 / 4~6번 7행 / 7~9번 10행(40->50 넘기기 허용)
+   2) 10~12번: 2자리(2위) 가감산 5행
+               10번 = 2행,5행 마이너스 / 11번 = 3행,5행 마이너스 / 12번 = 3행,5행 마이너스
+   3) 13~14번: 2자리(2위) 가감산 10행, 3&7행 또는 4&8행 중 마이너스 2회
+   4) 15~16번: 3자리(3위) 가감산 10행, 3&7행 또는 4&8행 중 마이너스 2회
+   5) 17~18번: 4자리(4위) 가감산 10행, 4&8행 또는 5&9행 중 마이너스 2회
+   6) 19~20번: 5자리(5위) 가감산 10행, 4&8행 또는 5&9행 중 마이너스 2회
+   공통) 중간에 음수가 되지 않도록 하며, 뺄셈 결과는 해당 자리수 이상을 유지
+========================================================= */
+
+/* ---------- 화면 스케일 (1600x900 고정 캔버스) ---------- */
+const stage = document.getElementById('stage');
+function resizeStage(){
+  const scale = Math.min(window.innerWidth/1600, window.innerHeight/900);
+  stage.style.transform = 'scale(' + scale + ')';
+}
+window.addEventListener('resize', resizeStage);
+resizeStage();
+
+/* ---------- 유틸 ---------- */
+function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function pick(arr){ return arr[randInt(0,arr.length-1)]; }
+function fmt(n){ return Number(n).toLocaleString('en-US'); }
+function bigFont(len, base){
+  const size = base - Math.max(0, len-2)*40;
+  return Math.max(140, size) + 'px';
+}
+/* 문제식(예: "999 + 888 - 444") 길이에 맞춰 최대한 크게 - 뒷자리에서도 보이도록 */
+function exprFontSize(expr){
+  const len = expr.length;
+  if(len <= 20) return 56;
+  if(len <= 35) return 46;
+  if(len <= 55) return 38;
+  if(len <= 75) return 31;
+  if(len <= 95) return 26;
+  return 22;
+}
+/* 정답 숫자(콤마 포함) 길이에 맞춰 큼직하게 */
+function answerFontSize(str, base){
+  const len = str.length;
+  if(len <= 3) return base;
+  if(len <= 5) return Math.round(base*0.85);
+  if(len <= 7) return Math.round(base*0.7);
+  return Math.round(base*0.58);
+}
+
+class CancelledError extends Error{}
+let sessionToken = 0;
+let pendingTimeouts = [];
+function clearPending(){ pendingTimeouts.forEach(id=>clearTimeout(id)); pendingTimeouts = []; }
+function wait(ms){
+  const myToken = sessionToken;
+  return new Promise((resolve, reject)=>{
+    const id = setTimeout(()=>{
+      if(myToken !== sessionToken){ reject(new CancelledError()); }
+      else resolve();
+    }, ms);
+    pendingTimeouts.push(id);
+  });
+}
+function checkAlive(myToken){ if(myToken !== sessionToken) throw new CancelledError(); }
+
+/* ---------- 사운드 (숫자 플래시 시 "띠-띠-띠" 비프음) ---------- */
+let audioCtx = null;
+let soundEnabled = true;
+function ensureAudio(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
+  }
+  if(audioCtx && audioCtx.state === 'suspended'){ audioCtx.resume(); }
+}
+function beep(){
+  if(!soundEnabled || !audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = 880;
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(0.3, t0 + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.15);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + 0.16);
+}
+function waitForEvent(el, evt){
+  const myToken = sessionToken;
+  return new Promise((resolve, reject)=>{
+    function handler(e){
+      el.removeEventListener(evt, handler);
+      if(myToken !== sessionToken){ reject(new CancelledError()); }
+      else resolve(e);
+    }
+    el.addEventListener(evt, handler, {once:true});
+  });
+}
+
+/* ---------- 문제 출제 설정 ---------- */
+const PROBLEM_CONFIG = [
+  {no:1,  digits:1, rows:5,  neg:[]},
+  {no:2,  digits:1, rows:5,  neg:[]},
+  {no:3,  digits:1, rows:5,  neg:[]},
+  {no:4,  digits:1, rows:7,  neg:[]},
+  {no:5,  digits:1, rows:7,  neg:[]},
+  {no:6,  digits:1, rows:7,  neg:[]},
+  {no:7,  digits:1, rows:10, neg:[], allow50:true},
+  {no:8,  digits:1, rows:10, neg:[], allow50:true},
+  {no:9,  digits:1, rows:10, neg:[], allow50:true},
+  {no:10, digits:2, rows:5,  neg:[2,5]},
+  {no:11, digits:2, rows:5,  neg:[3,5]},
+  {no:12, digits:2, rows:5,  neg:[3,5]},
+  {no:13, digits:2, rows:10, negOptions:[[3,7],[4,8]]},
+  {no:14, digits:2, rows:10, negOptions:[[3,7],[4,8]]},
+  {no:15, digits:3, rows:10, negOptions:[[3,7],[4,8]]},
+  {no:16, digits:3, rows:10, negOptions:[[3,7],[4,8]]},
+  {no:17, digits:4, rows:10, negOptions:[[4,8],[5,9]]},
+  {no:18, digits:4, rows:10, negOptions:[[4,8],[5,9]]},
+  {no:19, digits:5, rows:10, negOptions:[[4,8],[5,9]]},
+  {no:20, digits:5, rows:10, negOptions:[[4,8],[5,9]]},
+];
+function levelLabel(cfg){ return cfg.digits + '위'; }
+function isAddSub(cfg){ return cfg.digits >= 2; }
+function digitRange(d){
+  if(d===1) return [1,9];
+  return [Math.pow(10,d-1), Math.pow(10,d)-1];
+}
+
+/* 1자리 가산 기술 분류: 주판 5알/1알 구조 기준으로 direct(직접가산) / comp5(5의보수,"짝")
+   / comp10(10의보수,"보수") / double(이중보수)를 정확히 판별한다. */
+function classify(d, b){
+  const f = d>=5?1:0, u = d-5*f;
+  const bf = b>=5?1:0, bu = b-5*bf;
+  if((f+bf)<=1 && (u+bu)<=4) return 'direct';
+  const sum = d+b;
+  if(sum<=9) return 'comp5';
+  const m = 10-b;
+  const mf = m>=5?1:0, mu = m-5*mf;
+  if(mf<=f && mu<=u) return 'comp10';
+  return 'double';
+}
+/* 1~9번 전용 생성기: 5의보수("짝")·이중보수는 절대 출제하지 않고
+   직접가산 + 10의보수("보수")만 사용한다 (실제 기출 비율과 일치, 항상 생성 가능). */
+/* 같은 수가 연속으로 나오는 것(예: 2+2)을 피하기 위해 직전에 사용한 값은 제외 */
+function generateSingleDigitComplementRow(rows){
+  const seq = [randInt(1,9)];
+  let total = seq[0];
+  for(let i=2; i<=rows; i++){
+    const d = total % 10;
+    const prevVal = seq[seq.length-1];
+    let cands = [];
+    for(let b=1; b<=9; b++){
+      const c = classify(d,b);
+      if((c === 'direct' || c === 'comp10') && b !== prevVal) cands.push(b);
+    }
+    if(cands.length === 0){
+      for(let b=1; b<=9; b++){
+        const c = classify(d,b);
+        if(c === 'direct' || c === 'comp10') cands.push(b);
+      }
+    }
+    const b = pick(cands);
+    total += b;
+    seq.push(b);
+  }
+  return {rows: seq, total: total};
+}
+/* 두 자리 이상 숫자용 보조 함수: 같은 숫자가 반복되는 수(44,88 등)와
+   직전 수와 자릿수 구성이 같은 수(48 다음에 84 등)를 피해 다양하게 출제 */
+function hasAllSameDigits(n){
+  const s = String(n);
+  if(s.length < 2) return false;
+  for(let i=1; i<s.length; i++){ if(s[i] !== s[0]) return false; }
+  return true;
+}
+function digitKey(n){ return String(n).split('').sort().join(''); }
+function leadingDigit(n){ return String(n)[0]; }
+/* 연속된 두 수가 같은 값/자릿수 구성을 갖지 않도록 하는 것에 더해,
+   맨 앞자리(최상위 자릿수) 숫자도 직전 수와 겹치지 않도록 한다
+   (예: 33+38, 991+982 처럼 앞자리가 반복되는 패턴을 지양). */
+function pickVariedNumber(lo, hi, prevAbsVal){
+  for(let t=0; t<400; t++){
+    const v = randInt(lo, hi);
+    if(hasAllSameDigits(v)) continue;
+    if(prevAbsVal !== null && digitKey(v) === digitKey(prevAbsVal)) continue;
+    if(prevAbsVal !== null && leadingDigit(v) === leadingDigit(prevAbsVal)) continue;
+    return v;
+  }
+  for(let t=0; t<400; t++){
+    const v = randInt(lo, hi);
+    if(prevAbsVal !== null && digitKey(v) === digitKey(prevAbsVal)) continue;
+    if(prevAbsVal !== null && leadingDigit(v) === leadingDigit(prevAbsVal)) continue;
+    return v;
+  }
+  for(let t=0; t<400; t++){
+    const v = randInt(lo, hi);
+    if(prevAbsVal !== null && leadingDigit(v) === leadingDigit(prevAbsVal)) continue;
+    return v;
+  }
+  return randInt(lo, hi);
+}
+
+function generateProblem(cfg){
+  if(cfg.digits === 1 && (!cfg.neg || cfg.neg.length === 0)){
+    const r = generateSingleDigitComplementRow(cfg.rows);
+    return {rows: r.rows, total: r.total, cfg: cfg};
+  }
+  const [lo,hi] = digitRange(cfg.digits);
+  const floor = Math.pow(10, cfg.digits-1);
+  const negPositions = cfg.neg ? cfg.neg.slice() : (cfg.negOptions ? pick(cfg.negOptions).slice() : []);
+  for(let attempt=0; attempt<3000; attempt++){
+    let rows = [];
+    let total = 0;
+    let ok = true;
+    for(let i=1; i<=cfg.rows; i++){
+      const prevAbsVal = rows.length > 0 ? Math.abs(rows[rows.length-1]) : null;
+      if(negPositions.indexOf(i) !== -1){
+        const minM = lo;
+        const maxM = Math.min(hi, total - floor);
+        if(maxM < minM){ ok = false; break; }
+        const m = pickVariedNumber(minM, maxM, prevAbsVal);
+        total -= m;
+        rows.push(-m);
+      } else {
+        const v = pickVariedNumber(lo, hi, prevAbsVal);
+        total += v;
+        rows.push(v);
+      }
+    }
+    if(ok && total > 0){
+      return {rows: rows, total: total, cfg: cfg};
+    }
+  }
+  // fallback (매우 드문 경우) : 마이너스 없이 생성
+  let rows = [], total = 0;
+  for(let i=1; i<=cfg.rows; i++){
+    const prevAbsVal = rows.length > 0 ? Math.abs(rows[rows.length-1]) : null;
+    const v = pickVariedNumber(lo, hi, prevAbsVal);
+    total += v; rows.push(v);
+  }
+  return {rows: rows, total: total, cfg: cfg};
+}
+function buildExpression(rows){
+  return rows.map(function(v, i){
+    if(i === 0) return String(v);
+    return v < 0 ? (' - ' + String(-v)) : (' + ' + String(v));
+  }).join('');
+}
+function generateSession(){
+  return PROBLEM_CONFIG.map(function(cfg){
+    const res = generateProblem(cfg);
+    return Object.assign({no: cfg.no, expr: buildExpression(res.rows)}, res);
+  });
+}
+let sessionLog = [];
+
+/* ---------- 렌더링 루트 ---------- */
+const app = document.getElementById('app');
+let contentEl = null, topbarEl = null;
+
+function renderHome(){
+  sessionToken++; clearPending();
+  app.innerHTML =
+    '<div class="home">' +
+      '<div class="home-logo">주산수리셈 <span>플래시 암산</span></div>' +
+      '<div class="home-sub">전체 20문제 · 0.8초 간격 플래시 암산 연습</div>' +
+      '<div class="mode-cards">' +
+        '<div class="mode-card" id="modeCompetition">' +
+          '<div class="mode-icon">🏆</div>' +
+          '<div class="mode-title">대회 연습용</div>' +
+          '<div class="mode-desc">키보드 또는 화면 숫자패드로<br>정답을 입력합니다.<br>20문제 후 채점 결과를 확인해요.</div>' +
+        '</div>' +
+        '<div class="mode-card" id="modeClassroom">' +
+          '<div class="mode-icon">🏫</div>' +
+          '<div class="mode-title">수업용</div>' +
+          '<div class="mode-desc">수동(다음 버튼) 또는<br>자동(3·5·7초 타이머) 진행<br>20문제 후 정답을 한번에 공개합니다.</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.getElementById('modeCompetition').addEventListener('click', startCompetition);
+  document.getElementById('modeClassroom').addEventListener('click', renderClassroomSetup);
+}
+
+function renderClassroomSetup(){
+  sessionToken++; clearPending();
+  let chosenMode = 'manual', chosenTime = 5;
+  app.innerHTML =
+    '<div class="home">' +
+      '<div class="home-logo" style="font-size:64px;">수업용 설정</div>' +
+      '<div class="setup-group">' +
+        '<div class="setup-label">진행 방식</div>' +
+        '<div class="setup-options" id="modeOptions">' +
+          '<button class="opt-btn active" data-v="manual">수동 (다음 버튼)</button>' +
+          '<button class="opt-btn" data-v="auto">자동 (타이머)</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="setup-group" id="timeGroup" style="display:none;">' +
+        '<div class="setup-label">답 쓰는 시간</div>' +
+        '<div class="setup-options" id="timeOptions">' +
+          '<button class="opt-btn" data-v="3">3초</button>' +
+          '<button class="opt-btn active" data-v="5">5초</button>' +
+          '<button class="opt-btn" data-v="7">7초</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="result-actions">' +
+        '<button class="btn-next" id="startClassBtn">수업 시작 ▶</button>' +
+        '<button class="btn-secondary" id="backHomeBtn">뒤로</button>' +
+      '</div>' +
+    '</div>';
+  document.getElementById('modeOptions').addEventListener('click', function(e){
+    const b = e.target.closest('.opt-btn'); if(!b) return;
+    Array.prototype.forEach.call(document.getElementById('modeOptions').children, c=>c.classList.remove('active'));
+    b.classList.add('active'); chosenMode = b.dataset.v;
+    document.getElementById('timeGroup').style.display = (chosenMode==='auto') ? 'flex' : 'none';
+  });
+  document.getElementById('timeOptions').addEventListener('click', function(e){
+    const b = e.target.closest('.opt-btn'); if(!b) return;
+    Array.prototype.forEach.call(document.getElementById('timeOptions').children, c=>c.classList.remove('active'));
+    b.classList.add('active'); chosenTime = parseInt(b.dataset.v,10);
+  });
+  document.getElementById('startClassBtn').addEventListener('click', function(){
+    startClassroom({mode: chosenMode, answerTime: chosenTime});
+  });
+  document.getElementById('backHomeBtn').addEventListener('click', renderHome);
+}
+
+function beginSessionUI(){
+  app.innerHTML = '<div id="topbar"></div><div id="content" class="content"></div>';
+  contentEl = document.getElementById('content');
+  topbarEl = document.getElementById('topbar');
+}
+function startCompetition(){
+  ensureAudio();
+  sessionToken++; clearPending();
+  beginSessionUI();
+  runSession('competition', {});
+}
+function startClassroom(settings){
+  ensureAudio();
+  sessionToken++; clearPending();
+  beginSessionUI();
+  runSession('classroom', settings);
+}
+function quitToHome(){
+  if(cancelPendingAnswerInput){ cancelPendingAnswerInput(); }
+  sessionToken++; clearPending();
+  renderHome();
+}
+
+/* 현재까지 푼 만큼만 채점/공개하고 세션을 즉시 종료 (20번까지 기다릴 필요 없음) */
+let liveMode = null;
+let liveResults = [];
+function viewAnswersNow(){
+  if(cancelPendingAnswerInput){ cancelPendingAnswerInput(); }
+  sessionToken++; clearPending();
+  if(liveMode === 'competition'){
+    renderResult(liveResults);
+  } else {
+    renderClassroomFinish(sessionLog);
+  }
+}
+
+/* ---------- 모달 (문제 다시보기) ---------- */
+function openModal(innerHtml){
+  let modal = document.getElementById('modalOverlay');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'modalOverlay';
+    modal.className = 'modal-overlay';
+    stage.appendChild(modal);
+  }
+  modal.innerHTML = '<div class="modal-card">' + innerHtml + '<button class="btn-secondary" id="modalCloseBtn">닫기</button></div>';
+  modal.style.display = 'flex';
+  document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+  modal.addEventListener('click', function(e){ if(e.target === modal) closeModal(); });
+}
+function closeModal(){
+  const modal = document.getElementById('modalOverlay');
+  if(modal) modal.style.display = 'none';
+}
+function renderTopbar(current, total, mode){
+  topbarEl.innerHTML =
+    '<div class="logo">주산수리셈 <span>플래시암산</span></div>' +
+    '<div class="progress">' + current + ' / ' + total + ' · ' + (mode==='competition' ? '대회연습' : '수업용') + '</div>' +
+    '<div class="topbar-right">' +
+      '<button class="viewans-btn" id="viewAnswersBtn">✅ 정답보기</button>' +
+      '<button class="sound-btn" id="soundBtn">' + (soundEnabled ? '🔊' : '🔇') + '</button>' +
+      '<button class="quit-btn" id="quitBtn">종료</button>' +
+    '</div>';
+  document.getElementById('quitBtn').addEventListener('click', quitToHome);
+  document.getElementById('viewAnswersBtn').addEventListener('click', viewAnswersNow);
+  document.getElementById('soundBtn').addEventListener('click', function(){
+    soundEnabled = !soundEnabled;
+    ensureAudio();
+    document.getElementById('soundBtn').textContent = soundEnabled ? '🔊' : '🔇';
+  });
+}
+
+function renderIntro(p, withStartBtn){
+  contentEl.innerHTML =
+    '<div class="screen">' +
+      '<div class="card intro-card">' +
+        '<div class="badge">' + p.no + '번 문제</div>' +
+        '<div class="sub">' + levelLabel(p.cfg) + ' · ' + p.cfg.rows + '행 ' + (isAddSub(p.cfg) ? '(가감산)' : '(덧셈)') + '</div>' +
+        '<div class="tip">문제는 0.8초 간격으로 출제됩니다.</div>' +
+        (withStartBtn ? '<button class="btn-next" id="startBtn">시작하기 ▶</button>' : '') +
+      '</div>' +
+    '</div>';
+}
+function renderReady(){
+  contentEl.innerHTML = '<div class="screen"><div class="card"><div class="prep-text">준비</div></div></div>';
+}
+async function runFlash(p, myToken){
+  contentEl.innerHTML = '<div class="screen"><div class="card"><div id="flashNum" class="flash-num"></div></div></div>';
+  const numEl = document.getElementById('flashNum');
+  for(let i=0; i<p.rows.length; i++){
+    checkAlive(myToken);
+    const v = p.rows[i];
+    const s = String(v);
+    numEl.textContent = s;
+    numEl.style.fontSize = (parseFloat(bigFont(s.length, 380)) * 0.8) + 'px';
+    numEl.style.color = 'var(--pos)';
+    numEl.classList.remove('pop');
+    void numEl.offsetWidth;
+    numEl.classList.add('pop');
+    beep();
+    await wait(800);
+    checkAlive(myToken);
+  }
+}
+
+function renderAnswerInput(){
+  contentEl.innerHTML =
+    '<div class="screen">' +
+      '<div class="input-panel-bg">' +
+        '<div class="answer-display" id="ansDisp"></div>' +
+        '<div class="keypad" id="keypad">' +
+          [1,2,3,4,5,6,7,8,9].map(n=>'<button class="key" data-k="'+n+'">'+n+'</button>').join('') +
+          '<button class="key key-clear" data-k="C">⌫ 지우기</button>' +
+          '<button class="key" data-k="0">0</button>' +
+          '<button class="key key-submit" data-k="ENTER">확인</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+/* 진행 중인 답안 입력을 정답보기/종료 버튼으로 즉시 끊을 수 있도록 취소 함수를 보관 */
+let cancelPendingAnswerInput = null;
+function waitForAnswer(myToken){
+  return new Promise((resolve, reject)=>{
+    let buf = '';
+    const disp = document.getElementById('ansDisp');
+    const keypad = document.getElementById('keypad');
+    function updateDisp(){ disp.textContent = buf; }
+    function submit(){
+      cleanup();
+      if(myToken !== sessionToken){ reject(new CancelledError()); return; }
+      resolve(buf === '' ? NaN : parseInt(buf,10));
+    }
+    function onKeyClick(e){
+      const btn = e.target.closest('.key'); if(!btn) return;
+      const k = btn.dataset.k;
+      if(k === 'C'){ buf = buf.slice(0,-1); }
+      else if(k === 'ENTER'){ submit(); return; }
+      else { if(buf.length < 7) buf += k; }
+      updateDisp();
+    }
+    function onKeyDown(e){
+      if(e.key >= '0' && e.key <= '9'){ if(buf.length < 7) buf += e.key; updateDisp(); }
+      else if(e.key === 'Backspace'){ buf = buf.slice(0,-1); updateDisp(); }
+      else if(e.key === 'Enter'){ submit(); }
+    }
+    function cleanup(){
+      keypad.removeEventListener('click', onKeyClick);
+      document.removeEventListener('keydown', onKeyDown);
+      cancelPendingAnswerInput = null;
+    }
+    keypad.addEventListener('click', onKeyClick);
+    document.addEventListener('keydown', onKeyDown);
+    cancelPendingAnswerInput = function(){ cleanup(); reject(new CancelledError()); };
+  });
+}
+
+async function showWritePrompt(settings, myToken){
+  const auto = settings.mode === 'auto';
+  contentEl.innerHTML =
+    '<div class="screen">' +
+      '<div class="card">' +
+        '<div class="prompt-text">답을 적어주세요</div>' +
+        (auto
+          ? '<div class="countdown" id="cd">' + settings.answerTime + '</div>' +
+            '<div class="timebar"><div class="timebar-fill" id="tbFill" style="animation:shrinkbar ' + settings.answerTime + 's linear forwards;"></div></div>'
+          : '<button class="btn-next" id="toAnswerBtn">다음 문제 ▶</button>') +
+      '</div>' +
+    '</div>';
+  if(!document.getElementById('shrinkbarStyle')){
+    const st = document.createElement('style');
+    st.id = 'shrinkbarStyle';
+    st.textContent = '@keyframes shrinkbar{from{width:100%;}to{width:0%;}}';
+    document.head.appendChild(st);
+  }
+  if(auto){
+    const cd = document.getElementById('cd');
+    let remain = settings.answerTime;
+    for(let i=0; i<settings.answerTime; i++){
+      await wait(1000); checkAlive(myToken);
+      remain--; cd.textContent = remain;
+    }
+  } else {
+    await waitForEvent(document.getElementById('toAnswerBtn'), 'click');
+  }
+}
+function renderResult(results){
+  if(results.length === 0){
+    app.innerHTML =
+      '<div class="screen result-screen">' +
+        '<div class="result-headline">아직 푼 문제가 없어요</div>' +
+        '<div class="result-actions">' +
+          '<button class="btn-next" id="retryBtn">새로운 문제 풀기</button>' +
+          '<button class="btn-secondary" id="homeBtn">처음으로</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('retryBtn').addEventListener('click', startCompetition);
+    document.getElementById('homeBtn').addEventListener('click', renderHome);
+    return;
+  }
+  const correctCount = results.filter(r=>r.correct).length;
+  const score = Math.round(correctCount/results.length*100);
+  app.innerHTML =
+    '<div class="screen result-screen">' +
+      '<div class="result-headline">' + correctCount + ' / ' + results.length + ' 문제 정답!</div>' +
+      '<div class="result-score">' + score + '점 · 항목을 누르면 문제를 다시 볼 수 있어요</div>' +
+      '<div class="result-grid">' +
+        results.map((r,idx) =>
+          '<div class="result-item ' + (r.correct ? 'ok' : 'no') + '" data-idx="' + idx + '">' +
+            '<span class="rq">' + r.no + '번 ' + (r.correct ? '⭕' : '❌') + '</span>' +
+            '<span>내 답: ' + (isNaN(r.userAnswer) ? '(미입력)' : fmt(r.userAnswer)) + '</span>' +
+            '<span>정답: ' + fmt(r.total) + '</span>' +
+            '<span class="rq-view">문제보기 ▸</span>' +
+          '</div>'
+        ).join('') +
+      '</div>' +
+      '<div class="result-actions">' +
+        '<button class="btn-next" id="retryBtn">새로운 문제 풀기</button>' +
+        '<button class="btn-secondary" id="homeBtn">처음으로</button>' +
+      '</div>' +
+    '</div>';
+  Array.prototype.forEach.call(document.querySelectorAll('.result-grid .result-item'), function(el){
+    el.addEventListener('click', function(){
+      const idx = parseInt(el.dataset.idx, 10);
+      const r = results[idx];
+      openModal('<div class="modal-title">' + r.no + '번 문제</div>' +
+        '<div class="modal-expr" style="font-size:' + exprFontSize(r.expr) + 'px">' + r.expr + '</div>' +
+        '<div class="modal-answer" style="font-size:' + answerFontSize(fmt(r.total), 76) + 'px">정답: ' + fmt(r.total) + '</div>');
+    });
+  });
+  document.getElementById('retryBtn').addEventListener('click', startCompetition);
+  document.getElementById('homeBtn').addEventListener('click', renderHome);
+}
+function renderClassroomFinish(problems){
+  if(problems.length === 0){
+    app.innerHTML =
+      '<div class="screen result-screen">' +
+        '<div class="result-headline">아직 푼 문제가 없어요</div>' +
+        '<div class="result-actions">' +
+          '<button class="btn-next" id="retryBtn">새로운 문제로 다시 시작</button>' +
+          '<button class="btn-secondary" id="homeBtn">처음으로</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('retryBtn').addEventListener('click', renderClassroomSetup);
+    document.getElementById('homeBtn').addEventListener('click', renderHome);
+    return;
+  }
+  app.innerHTML =
+    '<div class="screen result-screen">' +
+      '<div class="result-headline">전체 정답 공개 👏</div>' +
+      '<div class="result-score">' + problems.length + '문제 완료</div>' +
+      '<div class="result-grid classroom-grid">' +
+        problems.map(p =>
+          '<div class="result-item">' +
+            '<span class="rq">' + p.no + '번</span>' +
+            '<span class="rexpr" style="font-size:' + exprFontSize(p.expr) + 'px">' + p.expr + '</span>' +
+            '<span class="rans" style="font-size:' + answerFontSize(fmt(p.total), 44) + 'px">= ' + fmt(p.total) + '</span>' +
+          '</div>'
+        ).join('') +
+      '</div>' +
+      '<div class="result-actions">' +
+        '<button class="btn-next" id="retryBtn">새로운 문제로 다시 시작</button>' +
+        '<button class="btn-secondary" id="homeBtn">처음으로</button>' +
+      '</div>' +
+    '</div>';
+  document.getElementById('retryBtn').addEventListener('click', renderClassroomSetup);
+  document.getElementById('homeBtn').addEventListener('click', renderHome);
+}
+
+async function runSession(mode, settings){
+  const myToken = sessionToken;
+  const problems = generateSession();
+  const results = [];
+  sessionLog = [];
+  liveMode = mode;
+  liveResults = results;
+  try{
+    for(let idx=0; idx<problems.length; idx++){
+      const p = problems[idx];
+      renderTopbar(idx+1, problems.length, mode);
+      const manualClassroom = (mode === 'classroom' && settings.mode === 'manual');
+      renderIntro(p, manualClassroom);
+      if(manualClassroom){
+        await waitForEvent(document.getElementById('startBtn'), 'click');
+      } else {
+        await wait(1300); checkAlive(myToken);
+      }
+      renderReady();
+      await wait(900); checkAlive(myToken);
+      await runFlash(p, myToken);
+      if(mode === 'competition'){
+        renderAnswerInput();
+        const userAns = await waitForAnswer(myToken);
+        results.push({no:p.no, total:p.total, userAnswer:userAns, correct: userAns === p.total, expr:p.expr});
+        sessionLog.push({no:p.no, expr:p.expr, total:p.total});
+        await wait(200); checkAlive(myToken);
+      } else {
+        await showWritePrompt(settings, myToken);
+        sessionLog.push({no:p.no, expr:p.expr, total:p.total});
+      }
+    }
+    if(mode === 'competition'){ renderResult(results); }
+    else { renderClassroomFinish(sessionLog); }
+  } catch(e){
+    if(!(e instanceof CancelledError)){ console.error(e); }
+  }
+}
+
+renderHome();
+</script>
+</body>
+</html>
