@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>대한민국 주산암산 경기대회 플래시암산</title>
+<title>주산수리셈 플래시 암산</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
@@ -68,13 +68,19 @@
   .screen{width:100%;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:30px;}
 
   /* ---------- yellow card ---------- */
+  /* 문제(플래시 숫자)가 나올 때의 노란 화면 크기를 기준으로 삼아, 대기/안내 등
+     다른 모든 화면의 카드도 같은 크기(1520x600)로 통일한다 — 화면 전환 시 카드
+     크기가 바뀌면서 화면이 흔들리는 느낌이 들지 않도록 함. */
   .card{
     background:var(--yellow);border-radius:64px;
     box-shadow:0 0 0 9px #1a1a1a, 0 22px 0 rgba(0,0,0,0.25);
-    width:1260px;height:600px;
+    width:1520px;height:600px;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
     padding:20px;
   }
+  /* 플래시 숫자 화면은 숫자가 최대한 크게 보이도록 카드 안쪽 여백만 살짝 줄인다
+     (카드 바깥 크기는 다른 화면과 동일하게 유지). */
+  .card.flash-card{padding:10px;}
 
   /* intro card */
   .intro-card .badge{
@@ -197,17 +203,29 @@
   .result-item{cursor:pointer;}
   .result-item .rq-view{font-size:16px;color:#888;margin-top:4px;}
   .result-actions{margin-top:10px;display:flex;}
-  .classroom-grid{grid-template-columns:1fr !important;max-height:620px;width:1500px;}
+  /* 수업용 정답 공개: 문제식은 바로 보여주지 않고, 큼직한 정답 숫자만 카드별로
+     한 화면에(스크롤 없이) 모아 보여준 뒤 "문제보기"를 눌러야 개별 문제(식)를
+     확인할 수 있다. 20문제(5열×4행)가 한 화면에 다 들어오도록 다른 화면보다
+     제목·안내문·버튼 크기를 살짝 줄인다. */
+  .classroom-result-screen .result-headline{font-size:52px;}
+  .classroom-result-screen .result-score{font-size:30px;}
+  .classroom-result-screen .result-actions{margin-top:4px;}
+  .classroom-result-screen .btn-next{font-size:32px;padding:14px 44px;}
+  .classroom-result-screen .btn-secondary{font-size:26px;padding:12px 34px;}
+  .classroom-grid{
+    grid-template-columns:repeat(5,1fr) !important;max-height:660px;width:1540px;
+    gap:8px;
+  }
   .classroom-grid .result-item{
-    gap:10px;flex-direction:row;align-items:center;justify-content:space-between;
-    padding:22px 34px;cursor:default;
+    gap:3px;flex-direction:column;align-items:center;justify-content:center;
+    padding:7px 8px;cursor:pointer;
   }
-  .classroom-grid .rq{flex:none;font-size:28px;}
-  .classroom-grid .rexpr{
-    color:#222;font-family:Arial,sans-serif;font-weight:bold;font-style:italic;
-    word-break:break-all;flex:1;text-align:left;margin:0 20px;
+  .classroom-grid .rq{flex:none;font-size:18px;color:#555;}
+  .classroom-grid .rans{
+    font-family:Arial,sans-serif;font-weight:900;font-style:italic;
+    color:#15803d;flex:none;line-height:1;
   }
-  .classroom-grid .rans{font-size:38px;color:#15803d;font-weight:bold;flex:none;}
+  .classroom-grid .rq-view{font-size:13px;color:#888;}
 
   /* ---------- modal (문제 다시보기) ---------- */
   .modal-overlay{
@@ -323,8 +341,13 @@ function bigFont(len, base){
   return Math.max(140, size) + 'px';
 }
 /* 플래시 숫자 크기는 문제마다(자릿수마다) 바뀌면 혼란스러우므로,
-   1~20번 중 자릿수가 가장 큰 20번(5자리) 기준 크기로 전체 세션 동안 고정한다 */
-const FLASH_FONT_PX = parseFloat(bigFont(5, 380)) * 0.8;
+   1~20번 중 자릿수가 가장 큰 20번(5자리) 기준 크기로 전체 세션 동안 고정한다.
+   수업 시간에 화면으로 보기에 작다는 요청으로 마이너스 부호가 붙는 5자리 수
+   ("-99,999")가 나오는 최악의 경우를 기준으로 실측(Playwright) 계산해 380px까지
+   키웠으나, 실제 사용 환경(실제 Arial 폰트 등)에서는 5자리 음수일 때 화면을 벗어나는
+   경우가 있어 안전하게 그 크기의 80%로 조정.
+   (문제 출제 규칙과는 무관한 화면 표시 전용 값이며, 출제 로직은 전혀 건드리지 않음) */
+const FLASH_FONT_PX = 380 * 0.8;
 /* 문제식(예: "999 + 888 - 444") 길이에 맞춰 최대한 크게 - 뒷자리에서도 보이도록 */
 function exprFontSize(expr){
   const len = expr.length;
@@ -397,26 +420,26 @@ function waitForEvent(el, evt){
 
 /* ---------- 문제 출제 설정 ---------- */
 const PROBLEM_CONFIG = [
-  {no:1,  digits:1, rows:5,  neg:[]},
-  {no:2,  digits:1, rows:5,  neg:[]},
-  {no:3,  digits:1, rows:5,  neg:[]},
-  {no:4,  digits:1, rows:7,  neg:[]},
-  {no:5,  digits:1, rows:7,  neg:[]},
-  {no:6,  digits:1, rows:7,  neg:[]},
-  {no:7,  digits:1, rows:10, neg:[], allow50:true},
-  {no:8,  digits:1, rows:10, neg:[], allow50:true},
-  {no:9,  digits:1, rows:10, neg:[], allow50:true},
+  {no:1,  digits:1, rows:5,  neg:[], maxRepeatDigits:0},
+  {no:2,  digits:1, rows:5,  neg:[], maxRepeatDigits:0},
+  {no:3,  digits:1, rows:5,  neg:[], maxRepeatDigits:0},
+  {no:4,  digits:1, rows:7,  neg:[], maxRepeatDigits:1},
+  {no:5,  digits:1, rows:7,  neg:[], maxRepeatDigits:1},
+  {no:6,  digits:1, rows:7,  neg:[], maxRepeatDigits:1},
+  {no:7,  digits:1, rows:10, neg:[], allow50:true, maxRepeatDigits:2},
+  {no:8,  digits:1, rows:10, neg:[], allow50:true, maxRepeatDigits:2},
+  {no:9,  digits:1, rows:10, neg:[], allow50:true, maxRepeatDigits:2},
   {no:10, digits:2, rows:5,  neg:[2,5]},
   {no:11, digits:2, rows:5,  neg:[3,5]},
   {no:12, digits:2, rows:5,  neg:[3,5]},
-  {no:13, digits:2, rows:10, negOptions:[[3,7],[4,8]]},
-  {no:14, digits:2, rows:10, negOptions:[[3,7],[4,8]]},
-  {no:15, digits:3, rows:10, negOptions:[[3,7],[4,8]]},
-  {no:16, digits:3, rows:10, negOptions:[[3,7],[4,8]]},
-  {no:17, digits:4, rows:10, negOptions:[[4,8],[5,9]]},
-  {no:18, digits:4, rows:10, negOptions:[[4,8],[5,9]]},
-  {no:19, digits:5, rows:10, negOptions:[[4,8],[5,9]]},
-  {no:20, digits:5, rows:10, negOptions:[[4,8],[5,9]]},
+  {no:13, digits:2, rows:10, negOptions:[[3,7],[3,8]], trailingZeroCap:2},
+  {no:14, digits:2, rows:10, negOptions:[[3,7],[3,8]], trailingZeroCap:2},
+  {no:15, digits:3, rows:10, negOptions:[[3,8],[4,8]], trailingZeroCap:0},
+  {no:16, digits:3, rows:10, negOptions:[[3,8],[4,8]], trailingZeroCap:0},
+  {no:17, digits:4, rows:10, negOptions:[[3,8],[4,8]], trailingZeroCap:0},
+  {no:18, digits:4, rows:10, negOptions:[[3,8],[4,8]], trailingZeroCap:0},
+  {no:19, digits:5, rows:10, negOptions:[[3,8],[4,8]], trailingZeroCap:0},
+  {no:20, digits:5, rows:10, negOptions:[[3,8],[4,8]], trailingZeroCap:0},
 ];
 function levelLabel(cfg){ return cfg.digits + '위'; }
 function isAddSub(cfg){ return cfg.digits >= 2; }
@@ -440,29 +463,85 @@ function classify(d, b){
 }
 /* 1~9번 전용 생성기: 5의보수("짝")·이중보수는 절대 출제하지 않고
    직접가산 + 10의보수("보수")만 사용한다 (실제 기출 비율과 일치, 항상 생성 가능). */
-/* 같은 수가 연속으로 나오는 것(예: 2+2)을 피하기 위해 직전에 사용한 값은 제외 */
-function generateSingleDigitComplementRow(rows){
+/* 같은 수가 연속으로 나오는 것(예: 2+2)을 피하기 위해 직전에 사용한 값은 제외.
+   maxRepeatDigits: 한 문제 안에서 "2번까지" 반복 사용을 허용할 수 있는 서로 다른 숫자의 개수.
+   (1~3번:0 = 전부 다른 수만, 4~6번:1 = 1개 숫자만 1회 반복 허용, 7~9번:2 = 2개 숫자까지 반복 허용)
+   단, 어떤 숫자든 같은 문제 안에서 3번 이상 나오는 것은 항상 금지한다.
+   한 번의 생성 시도만으로는 자릿수 배분상 어쩔 수 없이 반복 허용 개수를 넘길 때가 있어,
+   조건을 만족할 때까지 여러 번 다시 시도한다(그래도 안 되면 3번 이상 반복만은 피한 결과를 사용). */
+function generateSingleDigitComplementRowOnce(rows, maxRepeatDigits){
   const seq = [randInt(1,9)];
   let total = seq[0];
+  const countMap = {};
+  countMap[seq[0]] = 1;
+  const MAX_REPEAT = 2;
+  let repeatedDigitsUsed = 0;
   for(let i=2; i<=rows; i++){
     const d = total % 10;
     const prevVal = seq[seq.length-1];
+    function feasible(b){
+      const c = classify(d,b);
+      return c === 'direct' || c === 'comp10';
+    }
+    function underCap(b){ return (countMap[b]||0) < MAX_REPEAT; }
+    function repeatSlotOk(b){
+      const c = countMap[b]||0;
+      if(c === 1) return repeatedDigitsUsed < maxRepeatDigits;
+      return true;
+    }
     let cands = [];
     for(let b=1; b<=9; b++){
-      const c = classify(d,b);
-      if((c === 'direct' || c === 'comp10') && b !== prevVal) cands.push(b);
+      if(feasible(b) && underCap(b) && b !== prevVal && repeatSlotOk(b)) cands.push(b);
     }
     if(cands.length === 0){
       for(let b=1; b<=9; b++){
-        const c = classify(d,b);
-        if(c === 'direct' || c === 'comp10') cands.push(b);
+        if(feasible(b) && underCap(b) && repeatSlotOk(b)) cands.push(b);
+      }
+    }
+    if(cands.length === 0){
+      for(let b=1; b<=9; b++){
+        if(feasible(b) && underCap(b) && b !== prevVal) cands.push(b);
+      }
+    }
+    if(cands.length === 0){
+      for(let b=1; b<=9; b++){
+        if(feasible(b) && underCap(b)) cands.push(b);
+      }
+    }
+    if(cands.length === 0){
+      for(let b=1; b<=9; b++){
+        if(feasible(b)) cands.push(b);
       }
     }
     const b = pick(cands);
+    const wasOne = (countMap[b]||0) === 1;
     total += b;
     seq.push(b);
+    countMap[b] = (countMap[b]||0) + 1;
+    if(wasOne) repeatedDigitsUsed++;
   }
-  return {rows: seq, total: total};
+  let maxCount = 0, distinctRepeats = 0;
+  Object.keys(countMap).forEach(function(k){
+    const c = countMap[k];
+    if(c > maxCount) maxCount = c;
+    if(c >= 2) distinctRepeats++;
+  });
+  return {rows: seq, total: total, maxCount: maxCount, distinctRepeats: distinctRepeats};
+}
+function generateSingleDigitComplementRow(rows, maxRepeatDigits){
+  if(typeof maxRepeatDigits !== 'number') maxRepeatDigits = 2;
+  let fallback = null;
+  for(let attempt=0; attempt<500; attempt++){
+    const r = generateSingleDigitComplementRowOnce(rows, maxRepeatDigits);
+    if(r.maxCount <= 2 && r.distinctRepeats <= maxRepeatDigits){
+      return {rows: r.rows, total: r.total};
+    }
+    if(r.maxCount <= 2 && (fallback === null || r.distinctRepeats < fallback.distinctRepeats)){
+      fallback = r;
+    }
+  }
+  const last = fallback || generateSingleDigitComplementRowOnce(rows, maxRepeatDigits);
+  return {rows: last.rows, total: last.total};
 }
 /* 두 자리 이상 숫자용 보조 함수: 같은 숫자가 반복되는 수(44,88 등)와
    직전 수와 자릿수 구성이 같은 수(48 다음에 84 등)를 피해 다양하게 출제 */
@@ -476,6 +555,16 @@ function digitKey(n){ return String(n).split('').sort().join(''); }
 function leadingDigit(n){ return String(n)[0]; }
 function hasConsecutiveZero(n){ return String(n).indexOf('00') !== -1; }
 function hasZeroDigit(n){ return String(n).indexOf('0') !== -1; }
+/* 한 수 안에서 같은 숫자(0 포함)가 2번 이상 나오는지 검사 (예: 669, 8899, 60045 금지) */
+function hasRepeatedDigit(n){
+  const s = String(Math.abs(n));
+  const seen = {};
+  for(let i=0; i<s.length; i++){
+    if(seen[s[i]]) return true;
+    seen[s[i]] = true;
+  }
+  return false;
+}
 /* 연속된 두 수가 같은 값/자릿수 구성을 갖지 않도록 하는 것에 더해,
    맨 앞자리(최상위 자릿수) 숫자도 직전 수와 겹치지 않도록 한다
    (예: 33+38, 991+982 처럼 앞자리가 반복되는 패턴을 지양).
@@ -488,6 +577,7 @@ function pickVariedNumber(lo, hi, prevAbsVal, opts){
     if(opts.noConsecZero && hasConsecutiveZero(v)) return false;
     if(opts.forceNoZero && hasZeroDigit(v)) return false;
     if(opts.noTrailingZero && endsInZero(v)) return false;
+    if(opts.noRepeatedDigit && hasRepeatedDigit(v)) return false;
     return true;
   }
   for(let t=0; t<400; t++){
@@ -526,32 +616,37 @@ function pickVariedNumber(lo, hi, prevAbsVal, opts){
 
 function generateProblem(cfg){
   if(cfg.digits === 1 && (!cfg.neg || cfg.neg.length === 0)){
-    const r = generateSingleDigitComplementRow(cfg.rows);
+    const r = generateSingleDigitComplementRow(cfg.rows, cfg.maxRepeatDigits);
     return {rows: r.rows, total: r.total, cfg: cfg};
   }
   const [lo,hi] = digitRange(cfg.digits);
   const floor = Math.pow(10, cfg.digits-1);
   const negPositions = cfg.neg ? cfg.neg.slice() : (cfg.negOptions ? pick(cfg.negOptions).slice() : []);
-  /* 15번(3자리)부터는 100, 1004처럼 0이 연속으로 나오는 수를 지양하고,
+  /* 15번(3자리)부터는 100, 1004처럼 0이 연속으로 나오는 수를 지양하고, 한 수 안에서 같은 숫자가
+     반복되지 않도록 한다(예: 669, 8899, 60045 금지 / 203, 6091처럼 중간에 0이 오는 것은 허용).
      17번(4자리)부터는 한 문제 안에서 0이 포함된 수가 최대 2개까지만 나오도록 한다.
      10~12번(2자리, 5행)은 20/90/80처럼 0으로 끝나는(=0이 포함된) 수 자체를 아예 배제한다.
-     15번 이상부터는 문제의 마지막 수가 0으로 끝나지 않도록 한다(중간 행은 0이 있어도 됨). */
+     13~14번은 몇십(0으로 끝나는 수)이 한 문제에 최대 2개까지만 나오도록 하고,
+     15번 이상부터는 모든 행에서 0으로 끝나는 수 자체를 배제한다(중간 자리의 0은 허용). */
   const noConsecZero = cfg.digits >= 3;
+  const noRepeatedDigit = cfg.digits >= 3;
   const zeroCap = cfg.digits >= 4 ? 2 : Infinity;
   const forceNoZeroAlways = cfg.noZero === true || (cfg.no >= 10 && cfg.no <= 12);
-  const noTrailingZeroRule = cfg.digits >= 3;
+  const trailingZeroCap = (typeof cfg.trailingZeroCap === 'number') ? cfg.trailingZeroCap : Infinity;
   for(let attempt=0; attempt<3000; attempt++){
     let rows = [];
     let total = 0;
     let ok = true;
     let zeroCount = 0;
+    let trailingZeroCount = 0;
     for(let i=1; i<=cfg.rows; i++){
       const prevAbsVal = rows.length > 0 ? Math.abs(rows[rows.length-1]) : null;
       const forceNoZero = forceNoZeroAlways || (zeroCount >= zeroCap);
       const opts = {
         noConsecZero: noConsecZero,
         forceNoZero: forceNoZero,
-        noTrailingZero: noTrailingZeroRule && (i === cfg.rows)
+        noTrailingZero: trailingZeroCount >= trailingZeroCap,
+        noRepeatedDigit: noRepeatedDigit
       };
       if(negPositions.indexOf(i) !== -1){
         const minM = lo;
@@ -559,11 +654,13 @@ function generateProblem(cfg){
         if(maxM < minM){ ok = false; break; }
         const m = pickVariedNumber(minM, maxM, prevAbsVal, opts);
         if(hasZeroDigit(m)) zeroCount++;
+        if(endsInZero(m)) trailingZeroCount++;
         total -= m;
         rows.push(-m);
       } else {
         const v = pickVariedNumber(lo, hi, prevAbsVal, opts);
         if(hasZeroDigit(v)) zeroCount++;
+        if(endsInZero(v)) trailingZeroCount++;
         total += v;
         rows.push(v);
       }
@@ -579,7 +676,8 @@ function generateProblem(cfg){
     const v = pickVariedNumber(lo, hi, prevAbsVal, {
       noConsecZero: noConsecZero,
       forceNoZero: forceNoZeroAlways,
-      noTrailingZero: noTrailingZeroRule && (i === cfg.rows)
+      noTrailingZero: trailingZeroCap <= 0,
+      noRepeatedDigit: noRepeatedDigit
     });
     total += v; rows.push(v);
   }
@@ -757,7 +855,7 @@ function renderReady(){
 }
 async function runFlash(p, myToken){
   contentEl.innerHTML =
-    '<div class="screen"><div class="card">' +
+    '<div class="screen"><div class="card flash-card">' +
       '<div id="flashNum" class="flash-num">' +
         '<span class="flash-digits-wrap">' +
           '<span class="flash-sign" id="flashSign">-</span>' +
@@ -923,15 +1021,15 @@ function renderClassroomFinish(problems){
     return;
   }
   app.innerHTML =
-    '<div class="screen result-screen">' +
+    '<div class="screen result-screen classroom-result-screen">' +
       '<div class="result-headline">전체 정답 공개 👏</div>' +
-      '<div class="result-score">' + problems.length + '문제 완료</div>' +
+      '<div class="result-score">' + problems.length + '문제 완료 · "문제보기"를 누르면 문제를 다시 볼 수 있어요</div>' +
       '<div class="result-grid classroom-grid">' +
-        problems.map(p =>
-          '<div class="result-item">' +
+        problems.map((p, idx) =>
+          '<div class="result-item" data-idx="' + idx + '">' +
             '<span class="rq">' + p.no + '번</span>' +
-            '<span class="rexpr" style="font-size:' + exprFontSize(p.expr) + 'px">' + p.expr + '</span>' +
-            '<span class="rans" style="font-size:' + answerFontSize(fmt(p.total), 44) + 'px">= ' + fmt(p.total) + '</span>' +
+            '<span class="rans" style="font-size:' + answerFontSize(fmt(p.total), 64) + 'px">' + fmt(p.total) + '</span>' +
+            '<span class="rq-view">문제보기 ▸</span>' +
           '</div>'
         ).join('') +
       '</div>' +
@@ -940,6 +1038,15 @@ function renderClassroomFinish(problems){
         '<button class="btn-secondary" id="homeBtn">처음으로</button>' +
       '</div>' +
     '</div>';
+  Array.prototype.forEach.call(document.querySelectorAll('.classroom-grid .result-item'), function(el){
+    el.addEventListener('click', function(){
+      const idx = parseInt(el.dataset.idx, 10);
+      const p = problems[idx];
+      openModal('<div class="modal-title">' + p.no + '번 문제</div>' +
+        '<div class="modal-expr" style="font-size:' + exprFontSize(p.expr) + 'px">' + p.expr + '</div>' +
+        '<div class="modal-answer">정답: ' + fmt(p.total) + '</div>');
+    });
+  });
   document.getElementById('retryBtn').addEventListener('click', renderClassroomSetup);
   document.getElementById('homeBtn').addEventListener('click', renderHome);
 }
